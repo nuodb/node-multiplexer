@@ -1,5 +1,5 @@
 # node-multiplexer
-An optional middle-ware layer for the nuodb node.js driver. The multiplexer allows the user to have a set of pools and define how connection requests are mapped between pools to take advantage of the performance benefits of using multiple Transaction Engines with NuoDB.
+An optional middle-ware layer for the nuodb node.js driver. The multiplexer allows the user to have a set of pools and define how connection requests are mapped between pools to optimize caching benefits of using multiple Transaction Engines with NuoDB.
 
 ## Installation
 
@@ -70,13 +70,15 @@ const multiplexer = new ShardMultiplexer(multiplexerConfig)
 await multiplexer.init()
 ```
 
-**shards**: Required. This is a list of config objects for shards to spin up on initialization. The shard config requires an `id` which may be a string or a number, and a `poolConfig` which is a config object for a nuodb connection pool. For more information about configuration objects for the nuodb connection pool, please visit the [node.js nuodb driver](https://github.com/nuodb/node-nuodb).
+**shards**: Required. This is a list of config objects for shards to spin up on initialization. There is no limit to the size of the shards list. The shard config requires an `id` which may be a string or a number, and a `poolConfig` which is a config object for a nuodb connection pool. For more information about configuration objects for the nuodb connection pool, please visit the [node.js nuodb driver](https://github.com/nuodb/node-nuodb).
 
 **shardMapper**: Required. The `shardMapper` is a function can take in any number of arguments, and should return either a string or a number. The return value of the shard mapper should correspond to the shard id. This function is invoked when making a call to the `requestConnection` method of the multiplexer, and the return value is used to select a shard to request a connection from to return to the user.
 
 **poll**: Optional. A function which will be executed at an interval. The only argument passed to the `poll` function is the "this" argument, denoting the multiplexer instance executing the poll. The latest value returned from the `poll` function can be read by accessing the `pollResult` attribute of the multiplexer object.
 
 **pollInterval**: Optional. An integer specifying the microseconds between execution of the poll function.
+
+**Note**: poll and pollInterval should either both be set, or both be not set. If they are not set, then no polling function is executed. The polling function provides a convenient way for the user to poll the admin layer, or another API of the user's choice, for information which can be used to change the shardMapper, commission or decommission shards.
 
 ### Requesting and Releasing Connections
 ```
