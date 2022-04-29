@@ -153,6 +153,13 @@ const main = async () => {
       console.error(e.message);
     }
   },3000);
+  setInterval(() => {
+    try{
+      testConnection(2);
+    } catch (e) {
+      console.error(e.message);
+    }
+  },3000);
 }
 
 main()
