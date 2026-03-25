@@ -3,7 +3,7 @@
 //
 // Redistribution and use permitted under the terms of the 3-clause BSD license.
 
-const { ShardMultiplexer }= require('..');
+const { ShardMultiplexer } = require('..');
 const defaultConnectionConfig = require('../test/config');
 const MULTIPLEXER_POLL_INTERVAL = 1000;
 const https = require('http');
@@ -39,7 +39,7 @@ const getKVStoreValue = (hostname,port,key) => new Promise((res,rej)  => {
 
 const getLatestNumShards = async () => {
   const HOST = 'localhost';
-  const PORT = '8888';
+  const PORT = '8688';
   const KEY = 'numShards';
   try {
     const numShards = await getKVStoreValue(HOST,PORT,KEY);

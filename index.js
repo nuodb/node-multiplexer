@@ -2,10 +2,11 @@
 // All rights reserved.
 //
 // Redistribution and use permitted under the terms of the 3-clause BSD license.
-const { Pool } = require('node-nuodb');
+
+const { Pool, Rest } = require('node-nuodb');
 
 class ShardMultiplexerValidationError extends Error {
-  constructor(msg){
+  constructor(msg) {
     super(msg);
     this.name = 'ShardMultiplexerValidationError';
   }
@@ -21,18 +22,42 @@ class ShardMultiplexerNotFoundError extends Error {
 const REQUIRED_INITIAL_ARGUMENTS = ["shards", "shardMapper"];
 
 class ShardMultiplexer {
+  static allShardMultiplexers = [];
   static STATE_UNINITIALIZED = "uninitialized";
   static STATE_INITIALIZING = "initializing";
   static STATE_RUNNING = "running";
   static STATE_CLOSING = "closing";
   static STATE_CLOSED = "closed";
+
+  static getInfo() {
+    const replacer = (key, value) => {
+      if ((key === "livelinessInterval") || (key === "_idleTimeout") || (key === "_idlePrev") || (key === "_idleNext")) {
+        return undefined;
+      }
+      return value
+    }
+
+    return JSON.stringify(ShardMultiplexer.allShardMultiplexers, replacer, 2);
+  }
+
+  static getAsyncJSON = function() {
+    return Pool.getAsyncJSON();
+  };
+
+  static {
+    console.log(`Rest=${typeof(Rest.Rest)}`);
+    Rest.Rest.addInfo("Multiplexer", ShardMultiplexer.getInfo);
+  };
+
+
   /**
    *
    * @param {Object} args
    * @param {Function} args.shardMapper - A function that takes in arguments and returns an identifier for the shards object
    *                   The first argument is a this argument referencing the current multiplexer object
    * @param {Object[]} args.shards - A list of objects of the form {id: any, poolConfig: Driver.Pool.Config}
-   * @param {Function} poll - A function executed at interval pollInterval, accepting on argument which is the "this" argument for the multiplexer.
+   * @param {Function} poll - A function executed at interval pollInterval, accepting on argument which is the "this" argument
+   *                          for the multiplexer.
    * @param {Number} pollInterval - the interval in ms that the poll function should be executed.
    *
    */
@@ -40,7 +65,7 @@ class ShardMultiplexer {
     this.state = ShardMultiplexer.STATE_UNINITIALIZED;
     REQUIRED_INITIAL_ARGUMENTS.forEach(
       r => {
-        if(!(r in args)){
+        if (!(r in args)) {
           throw new ShardMultiplexerValidationError(`Cannot find required argument ${r} in constructor arguments`);
         }
       });
@@ -50,16 +75,17 @@ class ShardMultiplexer {
     // define curried init function
     this.init = this._init(args.shards);
 
-    if(ShardMultiplexer._pollIntervalIsValid(args.pollInterval)
-      && ShardMultiplexer._pollIsValid(args.poll)
+    if (ShardMultiplexer._pollIntervalIsValid(args.pollInterval) &&
+      ShardMultiplexer._pollIsValid(args.poll)
     ) {
       this._poll = args.poll;
       this._pollInterval = args.pollInterval;
       this._pollAndSetTimer();
     }
+    ShardMultiplexer.allShardMultiplexers.push(this);
   }
 
-  static _pollIsValid(p){
+  static _pollIsValid(p) {
     // this could potentially b
     return p instanceof Function;
   }
@@ -71,17 +97,17 @@ class ShardMultiplexer {
    * Call the poll function, and start/continue the cadence for polling
    */
   async _pollAndSetTimer() {
-    if(this.state === ShardMultiplexer.STATE_CLOSING || this.state === ShardMultiplexer.STATE_CLOSED)
+    if (this.state === ShardMultiplexer.STATE_CLOSING || this.state === ShardMultiplexer.STATE_CLOSED)
       throw new ShardMultiplexerValidationError(`poll still active when state is ${this.state}`);
     this._pollResult = await this._poll(this);
-    this.pollTimer = setTimeout(() => this._pollAndSetTimer(),this._pollInterval);
+    this.pollTimer = setTimeout(() => this._pollAndSetTimer(), this._pollInterval);
   }
 
   get pollResult() {
     return this._pollResult;
   }
 
-  set pollResult(any){
+  set pollResult(any) {
     throw new Error("The poll result can only be set by the ShardMultiplexer internal functions.");
   }
 
@@ -89,10 +115,10 @@ class ShardMultiplexer {
     return this._pollInterval;
   }
 
-  set pollInterval(interval){
-    if(!ShardMultiplexer._pollIntervalIsValid(interval)
-      || !ShardMultiplexer._pollIsValid(this._poll)
-    ){
+  set pollInterval(interval) {
+    if (!ShardMultiplexer._pollIntervalIsValid(interval) ||
+      !ShardMultiplexer._pollIsValid(this._poll)
+    ) {
       throw new ShardMultiplexerValidationError(`The poll interval ${interval} is invalid, or there is no poll function set.`);
     }
     this._pollInterval = interval;
@@ -107,7 +133,7 @@ class ShardMultiplexer {
   }
 
   set poll(p) {
-    if(!ShardMultiplexer._pollIsValid(p)){
+    if (!ShardMultiplexer._pollIsValid(p)) {
       throw new ShardMultiplexerValidationError("The poll attribute must be a valid function.");
     }
 
@@ -124,7 +150,7 @@ class ShardMultiplexer {
    */
   _init(shards) {
     return async () => {
-      if( this.state !== ShardMultiplexer.STATE_UNINITIALIZED){
+      if (this.state !== ShardMultiplexer.STATE_UNINITIALIZED) {
         throw new ShardMultiplexerValidationError(`Cannot initialize a multiplexer in state ${this.state}`);
       }
       await Promise.all(
@@ -137,7 +163,7 @@ class ShardMultiplexer {
   async close() {
     this.state = ShardMultiplexer.STATE_CLOSING
     clearTimeout(this.pollTimer);
-    await Object.keys(this.shards).reduce( async (acc, curr) => {
+    await Object.keys(this.shards).reduce(async (acc, curr) => {
       await acc;
       await this.decommissionShard(curr);
     }, Promise.resolve());
@@ -151,7 +177,7 @@ class ShardMultiplexer {
   async decommissionShard(id) {
     // ?     How should we be handling pools with a connection out there?
     const shard = this.shards[id];
-    if(!shard){
+    if (!shard) {
       throw new ShardMultiplexerNotFoundError(`Cannot find shard with id ${id}`);
     }
 
@@ -166,15 +192,21 @@ class ShardMultiplexer {
    * @param {Object} shard.config -- a configuration to be passed to the connection pool
    */
   async commissionShard(shard) {
-    if(this.shards?.[shard.id]?.pool){
+    //console.log(`Commission Shard=${shard.id}`);
+    if (this.shards?.[shard.id]?.pool) {
       throw new ShardMultiplexerValidationError(`There is already a shard commissioned with this id`);
     }
     // create the pool
     const shardPool = new Pool(shard.poolConfig);
     await shardPool.init();
 
+
     // destructured assign and add the pool in
-    this.shards[shard.id] = {...shard, pool: shardPool, activeConnections: []};
+    this.shards[shard.id] = {
+      ...shard,
+      pool: shardPool,
+      activeConnections: []
+    };
   }
 
   /**
@@ -185,7 +217,7 @@ class ShardMultiplexer {
   async releaseConnection(connection) {
     // ? What happens if the pool for this connection no longer exists?
     const shard = this.shards[connection?.shardId];
-    if(!shard){
+    if (!shard) {
       throw new ShardMultiplexerNotFoundError(`Cannot find associated shard for connection with shard id ${connection?.shardId}`);
     }
 
@@ -202,7 +234,7 @@ class ShardMultiplexer {
     const shardId = this.shardMapper(...args);
     const pool = this.shards[shardId]?.pool;
 
-    if(pool === undefined){
+    if (pool === undefined) {
       throw new ShardMultiplexerNotFoundError(`shardMapper returned shard id ${shardId}, which does not exist or has no associated connection pool`);
     }
 
@@ -212,4 +244,8 @@ class ShardMultiplexer {
   }
 }
 
-module.exports = {ShardMultiplexer, ShardMultiplexerValidationError, ShardMultiplexerNotFoundError};
+module.exports = {
+  ShardMultiplexer,
+  ShardMultiplexerValidationError,
+  ShardMultiplexerNotFoundError
+};
