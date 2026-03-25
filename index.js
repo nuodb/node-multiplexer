@@ -42,12 +42,12 @@ class ShardMultiplexer {
 
   static getAsyncJSON = function() {
     return Pool.getAsyncJSON();
-  };
+  }
 
   static {
-    console.log(`Rest=${typeof(Rest.Rest)}`);
-    Rest.Rest.addInfo("Multiplexer", ShardMultiplexer.getInfo);
-  };
+    //console.log(`Rest.Rest=${typeof(Rest.Rest)}`);
+    Rest.addInfo("Multiplexer", ShardMultiplexer.getInfo);
+  }
 
 
   /**
