@@ -1,6 +1,6 @@
 {
   "name": "nuodb-node-multiplexer",
-  "version": "4.2.0",
+  "version": "1.0.0",
   "description": "An optional middle-ware layer for the nuodb node.js driver. Manages a set of connection pools and allows the user to define how connection requests are mapped between pools to take advantage of permance benefits using multiple Transaction Engines with NuoDB.",
   "main": "index.js",
   "scripts": {
@@ -29,9 +29,9 @@
     "node-nuodb": "nuodb/node-nuodb#master"
   },
   "devDependencies": {
-    "mocha": "^9.1.3",
-    "should": "^13.2.3",
+    "eslint": "^9.34.0",
+    "mocha": "^9.2.2",
     "okay": "^1.0.0",
-    "eslint": "^8.6.0"
+    "should": "^13.2.3"
   }
 }

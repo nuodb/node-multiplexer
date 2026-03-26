@@ -3,7 +3,10 @@
 //
 // Redistribution and use permitted under the terms of the 3-clause BSD license.
 
-const { Pool, Rest } = require('node-nuodb');
+const {
+  Pool,
+  Rest
+} = require('node-nuodb');
 
 class ShardMultiplexerValidationError extends Error {
   constructor(msg) {
@@ -45,7 +48,7 @@ class ShardMultiplexer {
   }
 
   static {
-    //console.log(`Rest.Rest=${typeof(Rest.Rest)}`);
+    //    console.log(`Rest=${typeof(Rest)}`);
     Rest.addInfo("Multiplexer", ShardMultiplexer.getInfo);
   }
 
